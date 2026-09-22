@@ -46,6 +46,14 @@ jobs:
           python -m compileall -q app
           python -m pytest -q
 
+      - name: Run Docker safety integration test
+        env:
+          ZENTDCLEAN_RUN_DOCKER_INTEGRATION: "1"
+          ZENTDCLEAN_RUN_BUILDCACHE_INTEGRATION: "1"
+        run: |
+          docker pull python:3.14.7-slim
+          python -m pytest -q tests/test_docker_integration.py
+
       - name: Read application version
         id: version
         shell: bash
