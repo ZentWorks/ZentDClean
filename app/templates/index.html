@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="color-scheme" content="dark">
+  <meta name="theme-color" content="#0b0e13">
+  <meta name="application-name" content="ZentDClean">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="ZentDClean">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <title>ZentDClean</title>
+  <link rel="manifest" href="/manifest.webmanifest?v={{ asset_revision }}">
+  <link rel="icon" href="/static/favicon.ico?v={{ asset_revision }}" sizes="any">
+  <link rel="apple-touch-icon" sizes="180x180" href="/static/icons/apple-touch-icon.png?v={{ asset_revision }}">
+  <link rel="stylesheet" href="/static/app.css?v={{ asset_revision }}">
+</head>
+<body
+  data-logged-in="{{ '1' if logged_in else '0' }}"
+  data-auth-enabled="{{ '1' if auth_enabled else '0' }}"
+  data-asset-revision="{{ asset_revision }}"
+>
+  <div id="loginView" class="login-view hidden">
+    <main class="login-card">
+      <div class="brand brand-center"><img class="brand-logo" src="/static/icons/icon-64.png?v={{ asset_revision }}" alt=""><span>ZentDClean</span></div>
+      <h1 data-i18n="loginTitle">Anmelden</h1>
+      <form id="loginForm">
+        <label for="password" data-i18n="password">Passwort</label>
+        <input id="password" name="password" type="password" autocomplete="current-password" required autofocus>
+        <p id="loginError" class="error hidden"></p>
+        <button class="primary full" type="submit" data-i18n="login">Anmelden</button>
+      </form>
+      <label class="language-picker login-language-picker">
+        <span aria-hidden="true">🌐</span>
+        <select data-language-select data-i18n-aria-label="language" aria-label="Language">
+            <option value="de">Deutsch</option>
+            <option value="en">English</option>
+            <option value="fr">Français</option>
+            <option value="nl">Nederlands</option>
+            <option value="es">Español</option>
+            <option value="pt">Português</option>
+            <option value="pl">Polski</option>
+            <option value="it">Italiano</option>
+            <option value="cs">Čeština</option>
+        </select>
+      </label>
+    </main>
+  </div>
+
+  <div id="appView" class="app-view hidden">
+    <header class="topbar">
+      <div class="brand"><img class="brand-logo" src="/static/icons/icon-64.png?v={{ asset_revision }}" alt=""><span>ZentDClean</span></div>
+      <div class="header-actions">
+        <label class="language-picker">
+          <span aria-hidden="true">🌐</span>
+          <select data-language-select data-i18n-aria-label="language" aria-label="Language">
+            <option value="de">Deutsch</option>
+            <option value="en">English</option>
+            <option value="fr">Français</option>
+            <option value="nl">Nederlands</option>
+            <option value="es">Español</option>
+            <option value="pt">Português</option>
+            <option value="pl">Polski</option>
+            <option value="it">Italiano</option>
+            <option value="cs">Čeština</option>
+          </select>
+        </label>
+        <button id="refreshBtn" class="icon-button" type="button" title="Aktualisieren" aria-label="Aktualisieren">↻</button>
+        <button id="logoutBtn" class="text-button{% if not auth_enabled %} hidden{% endif %}" type="button" data-i18n="logout">Abmelden</button>
+      </div>
+    </header>
+
+    <main class="content">
+      <section class="cleanup-header">
+        <div>
+          <span class="eyebrow">Docker</span>
+          <h1 data-i18n="cleanupTitle">Aufräumen</h1>
+        </div>
+        <div class="reclaim-total">
+          <span data-i18n="reclaimable">Freigebbar</span>
+          <strong id="reclaimTotal">–</strong>
+        </div>
+      </section>
+
+      <section id="cards" class="cards"></section>
+
+      <button id="cleanAllBtn" class="primary clean-all" type="button">
+        <span data-i18n="cleanAll">Alles aufräumen</span>
+        <strong id="cleanAllSize"></strong>
+      </button>
+      <p id="globalError" class="error centered hidden"></p>
+    </main>
+
+    <footer><span>ZentDClean</span><span>v{{ version }}</span></footer>
+  </div>
+
+  <dialog id="cleanupDialog">
+    <form method="dialog" class="modal-shell">
+      <div class="modal-header">
+        <div>
+          <span class="eyebrow" id="modalEyebrow">Docker</span>
+          <h2 id="modalTitle">–</h2>
+        </div>
+        <button class="close-button" value="cancel" data-i18n-aria-label="close" aria-label="Close">×</button>
+      </div>
+
+      <div id="bulkActions" class="bulk-actions">
+        <button id="selectAllBtn" type="button" class="text-button" data-i18n="selectAll">Alle auswählen</button>
+        <button id="selectNoneBtn" type="button" class="text-button" data-i18n="selectNone">Keine auswählen</button>
+      </div>
+
+      <div id="cleanupResult" class="cleanup-result hidden" aria-live="polite"></div>
+      <div id="modalList" class="modal-list"></div>
+      <p id="modalEmpty" class="empty hidden" data-i18n="nothingToClean">Nichts zum Aufräumen gefunden.</p>
+      <p id="modalError" class="error modal-error hidden"></p>
+
+      <div class="modal-summary">
+        <span><span data-i18n="selected">Ausgewählt</span>: <strong id="selectedCount">0</strong></span>
+        <strong id="selectedSize">0 B</strong>
+      </div>
+
+      <div class="modal-footer">
+        <button value="cancel" class="secondary" data-i18n="cancel">Abbrechen</button>
+        <button id="deleteBtn" type="button" class="danger"><span data-i18n="delete">Löschen</span></button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="/static/app.js?v={{ asset_revision }}" defer></script>
+</body>
+</html>

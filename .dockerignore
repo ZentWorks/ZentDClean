@@ -1,0 +1,16 @@
+.git
+.github
+.github-release
+tests
+__pycache__
+*.pyc
+.pytest_cache
+.venv
+.env
+*.zip
+deploy.sh
+README.md
+LICENSE
+compose.yaml
+docker-compose.yml
+requirements-dev.txt
