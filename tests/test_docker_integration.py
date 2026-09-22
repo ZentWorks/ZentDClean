@@ -289,6 +289,7 @@ def test_cleanup_cannot_damage_running_container_or_its_resources(tmp_path: Path
                     expected_volume=active_volume,
                     expected_network=active_network,
                     expected_port_binding=port_binding,
+                    expected_published_binding=published_binding,
                     host_port=host_port,
                 )
 

@@ -323,3 +323,30 @@ def test_release_workflow_pins_third_party_actions_to_immutable_shas():
         deploy = deploy_path.read_text()
         for action, sha in expected.items():
             assert f"{action}@{sha}" in deploy
+
+
+def test_docker_integration_helper_calls_supply_all_required_keywords():
+    import ast
+
+    path = BASE / "tests/test_docker_integration.py"
+    tree = ast.parse(path.read_text())
+    helper = next(
+        node
+        for node in tree.body
+        if isinstance(node, ast.FunctionDef) and node.name == "_assert_active_container_unchanged"
+    )
+    required_keywords = {arg.arg for arg in helper.args.kwonlyargs}
+    calls = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "_assert_active_container_unchanged"
+    ]
+    assert calls, "Docker integration safety helper is never exercised"
+    for call in calls:
+        supplied = {keyword.arg for keyword in call.keywords if keyword.arg is not None}
+        assert required_keywords <= supplied, (
+            "Docker integration helper call is missing required keyword arguments: "
+            f"{sorted(required_keywords - supplied)}"
+        )
