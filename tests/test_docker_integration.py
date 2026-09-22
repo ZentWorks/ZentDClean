@@ -70,6 +70,7 @@ def _assert_active_container_unchanged(
     expected_volume: str,
     expected_network: str,
     expected_port_binding: list[dict[str, str]],
+    expected_published_binding: list[dict[str, str]],
     host_port: int,
 ) -> None:
     current = _inspect_container(container_name)
@@ -77,6 +78,7 @@ def _assert_active_container_unchanged(
     assert current["Image"] == expected_image_id
     assert current["State"]["Running"] is True
     assert current["HostConfig"]["PortBindings"]["8080/tcp"] == expected_port_binding
+    assert current["NetworkSettings"]["Ports"]["8080/tcp"] == expected_published_binding
     assert expected_network in current["NetworkSettings"]["Networks"]
     assert any(
         mount.get("Type") == "volume" and mount.get("Name") == expected_volume
@@ -160,7 +162,13 @@ def test_cleanup_cannot_damage_running_container_or_its_resources(tmp_path: Path
         active_id = initial["Id"]
         active_image_id = initial["Image"]
         port_binding = initial["HostConfig"]["PortBindings"]["8080/tcp"]
-        host_port = int(port_binding[0]["HostPort"])
+        published_binding = initial["NetworkSettings"]["Ports"]["8080/tcp"]
+        assert isinstance(published_binding, list) and len(published_binding) == 1
+        published_host_port = published_binding[0].get("HostPort", "")
+        assert published_host_port.isdigit(), (
+            f"Docker did not report a valid published host port: {published_binding!r}"
+        )
+        host_port = int(published_host_port)
         assert _http_ok(host_port), "fixture HTTP server never became reachable"
 
         service = DockerService(socket_path=DOCKER_SOCKET)
@@ -185,6 +193,7 @@ def test_cleanup_cannot_damage_running_container_or_its_resources(tmp_path: Path
             expected_volume=active_volume,
             expected_network=active_network,
             expected_port_binding=port_binding,
+            expected_published_binding=published_binding,
             host_port=host_port,
         )
 
@@ -213,6 +222,7 @@ def test_cleanup_cannot_damage_running_container_or_its_resources(tmp_path: Path
             expected_volume=active_volume,
             expected_network=active_network,
             expected_port_binding=port_binding,
+            expected_published_binding=published_binding,
             host_port=host_port,
         )
 
@@ -255,6 +265,7 @@ def test_cleanup_cannot_damage_running_container_or_its_resources(tmp_path: Path
             expected_volume=active_volume,
             expected_network=active_network,
             expected_port_binding=port_binding,
+            expected_published_binding=published_binding,
             host_port=host_port,
         )
 
@@ -291,6 +302,7 @@ def test_cleanup_cannot_damage_running_container_or_its_resources(tmp_path: Path
             expected_volume=active_volume,
             expected_network=active_network,
             expected_port_binding=port_binding,
+            expected_published_binding=published_binding,
             host_port=host_port,
         )
 
