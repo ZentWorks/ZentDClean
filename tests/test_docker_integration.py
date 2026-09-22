@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import shutil
+import socket
 import subprocess
 import time
 import urllib.request
@@ -44,6 +45,45 @@ def _docker(*args: str, input_text: str | None = None, check: bool = True) -> st
 
 def _inspect_container(name: str) -> dict:
     return json.loads(_docker("inspect", name))[0]
+
+
+def _free_loopback_port() -> int:
+    """Ask the kernel for a currently-free loopback TCP port."""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.bind(("127.0.0.1", 0))
+        return int(sock.getsockname()[1])
+
+
+def _start_active_container(
+    container_name: str,
+    network_name: str,
+    volume_name: str,
+    *,
+    attempts: int = 5,
+) -> int:
+    """Start the fixture with an explicit host port so restart invariants are meaningful."""
+    last_error: AssertionError | None = None
+    for _ in range(attempts):
+        host_port = _free_loopback_port()
+        try:
+            _docker(
+                "run", "-d",
+                "--name", container_name,
+                "--network", network_name,
+                "-v", f"{volume_name}:/data",
+                "-p", f"127.0.0.1:{host_port}:8080",
+                BASE_IMAGE,
+                "python", "-m", "http.server", "8080", "--bind", "0.0.0.0",
+            )
+            return host_port
+        except AssertionError as exc:
+            last_error = exc
+            # docker run can leave a created container behind when host-port
+            # allocation loses the small race after _free_loopback_port().
+            _docker("rm", "-f", container_name, check=False)
+    raise AssertionError(
+        f"could not start Docker integration fixture after {attempts} host-port attempts"
+    ) from last_error
 
 
 def _http_ok(port: int, attempts: int = 30) -> bool:
@@ -146,14 +186,10 @@ def test_cleanup_cannot_damage_running_container_or_its_resources(tmp_path: Path
         dockerfile_race = f"FROM {BASE_IMAGE}\nLABEL zentdclean.integration.race={token}\n"
         _docker("build", "--pull=false", "-t", race_image, "-", input_text=dockerfile_race)
 
-        _docker(
-            "run", "-d",
-            "--name", active_container,
-            "--network", active_network,
-            "-v", f"{active_volume}:/data",
-            "-p", "127.0.0.1::8080",
-            BASE_IMAGE,
-            "python", "-m", "http.server", "8080", "--bind", "0.0.0.0",
+        host_port = _start_active_container(
+            active_container,
+            active_network,
+            active_volume,
         )
         _docker("create", "--name", stopped_container, BASE_IMAGE, "true")
         _docker("create", "--name", race_container, BASE_IMAGE, "sleep", "60")
@@ -164,11 +200,14 @@ def test_cleanup_cannot_damage_running_container_or_its_resources(tmp_path: Path
         port_binding = initial["HostConfig"]["PortBindings"]["8080/tcp"]
         published_binding = initial["NetworkSettings"]["Ports"]["8080/tcp"]
         assert isinstance(published_binding, list) and len(published_binding) == 1
+        configured_host_port = port_binding[0].get("HostPort", "")
         published_host_port = published_binding[0].get("HostPort", "")
-        assert published_host_port.isdigit(), (
-            f"Docker did not report a valid published host port: {published_binding!r}"
+        assert configured_host_port == str(host_port), (
+            f"Docker did not retain the explicitly configured host port {host_port}: {port_binding!r}"
         )
-        host_port = int(published_host_port)
+        assert published_host_port == str(host_port), (
+            f"Docker did not publish the explicitly configured host port {host_port}: {published_binding!r}"
+        )
         assert _http_ok(host_port), "fixture HTTP server never became reachable"
 
         service = DockerService(socket_path=DOCKER_SOCKET)
